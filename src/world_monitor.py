@@ -1,77 +1,30 @@
-import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import List
+import time
 
 @dataclass
 class Event:
-    timestamp: datetime
-    semantic_tag: str
-    geographic_region: str
+    timestamp: float
+    data: str
 
 class WorldMonitor:
     def __init__(self):
         self.events = []
+        self.latency = 0
 
     def add_event(self, event: Event):
+        start_time = time.time()
         self.events.append(event)
+        end_time = time.time()
+        self.latency = (end_time - start_time) * 1000
 
-    def get_event_throughput(self, time_window: timedelta) -> int:
-        recent_events = [event for event in self.events if event.timestamp >= datetime.now() - time_window]
-        return len(recent_events)
+    def get_latency(self) -> float:
+        return self.latency
 
-    def get_events_by_tag(self, semantic_tag: str) -> List[Event]:
-        return [event for event in self.events if event.semantic_tag == semantic_tag]
+    def get_events_per_second(self) -> int:
+        if not self.events:
+            return 0
+        return len(self.events) / (self.events[-1].timestamp - self.events[0].timestamp)
 
-    def get_events_by_region(self, geographic_region: str) -> List[Event]:
-        return [event for event in self.events if event.geographic_region == geographic_region]
-
-    def get_grafana_dashboard_template(self) -> Dict:
-        return {
-            "rows": [
-                {
-                    "title": "Event Throughput",
-                    "panels": [
-                        {
-                            "id": 1,
-                            "title": "Last 5 minutes",
-                            "type": "graph",
-                            "span": 12,
-                            "targets": [
-                                {
-                                    "expr": "event_throughput{time_window='5m'}",
-                                    "legendFormat": "{{job}}",
-                                    "refId": "A"
-                                }
-                            ]
-                        },
-                        {
-                            "id": 2,
-                            "title": "Last 1 hour",
-                            "type": "graph",
-                            "span": 12,
-                            "targets": [
-                                {
-                                    "expr": "event_throughput{time_window='1h'}",
-                                    "legendFormat": "{{job}}",
-                                    "refId": "B"
-                                }
-                            ]
-                        },
-                        {
-                            "id": 3,
-                            "title": "Last 24 hours",
-                            "type": "graph",
-                            "span": 12,
-                            "targets": [
-                                {
-                                    "expr": "event_throughput{time_window='24h'}",
-                                    "legendFormat": "{{job}}",
-                                    "refId": "C"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
+    def is_reliable(self) -> bool:
+        return all(event.timestamp < self.events[-1].timestamp for event in self.events[:-1])
